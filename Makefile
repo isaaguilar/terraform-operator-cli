@@ -23,12 +23,6 @@ build: check-version
 release: build
 	/bin/bash hack/release.sh
 
-
-# update-installer:
-# 	mkdir -p gen && echo "defaultVersion: ${VERSION}" > gen/values.yaml
-# 	gt hack/install-opsbox.tpl.sh -f gen/values.yaml > install-opsbox.sh
-# 	curl -H "X-JFrog-Art-Api:${ARTIFACTORY_TOKEN}" -T ./install-opsbox.sh "https://artifactory.bf-aws.illumina.com/artifactory/archive-eibu-internal/opsbox/install-opsbox.sh"
-
 run: build
 
 
