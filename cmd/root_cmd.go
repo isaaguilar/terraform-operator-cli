@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/cli/cli/streams"
 	"github.com/ghodss/yaml"
+	tfv1alpha1 "github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha1"
 	tfo "github.com/isaaguilar/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -173,8 +174,10 @@ func er(msg interface{}) {
 func show(name string, allNamespaces, showPrevious bool) {
 	var data [][]string
 	var header []string
-
 	var namespaces []string
+	var tfs []tfv1alpha1.Terraform
+	var pods []corev1.Pod
+
 	if allNamespaces {
 		header = []string{"Namespace", "Name", "Generation", "Pods"}
 		namespaceClient := session.clientset.CoreV1().Namespaces()
@@ -185,21 +188,56 @@ func show(name string, allNamespaces, showPrevious bool) {
 		for _, namespace := range namespaceList.Items {
 			namespaces = append(namespaces, namespace.Name)
 		}
+
+		tfClient := session.tfoclientset.TfV1alpha1().Terraforms("")
+		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		tfs = tfList.Items
+
+		podClient := session.clientset.CoreV1().Pods("")
+		podList, err := podClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		pods = podList.Items
 	} else {
 		header = []string{"Name", "Generation", "Pods"}
 		namespaces = []string{session.namespace}
+
+		tfClient := session.tfoclientset.TfV1alpha1().Terraforms(session.namespace)
+		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		tfs = tfList.Items
+
+		podClient := session.clientset.CoreV1().Pods(session.namespace)
+		podList, err := podClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		pods = podList.Items
 	}
 
 	for _, namespace := range namespaces {
-		tfClient := session.tfoclientset.TfV1alpha1().Terraforms(namespace)
-		podClient := session.clientset.CoreV1().Pods(namespace)
 
-		tfs, err := tfClient.List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			log.Fatal(nil)
+		var namespacedTfs []tfv1alpha1.Terraform
+		for _, tf := range tfs {
+			if tf.Namespace == namespace {
+				namespacedTfs = append(namespacedTfs, tf)
+			}
 		}
 
-		for _, tf := range tfs.Items {
+		var namespacedPods []corev1.Pod
+		for _, pod := range pods {
+			if pod.Namespace == namespace {
+				namespacedPods = append(namespacedPods, pod)
+			}
+		}
+
+		for _, tf := range namespacedTfs {
 			data_index := len(data)
 			generation := fmt.Sprintf("%d", tf.Generation)
 
@@ -214,15 +252,9 @@ func show(name string, allNamespaces, showPrevious bool) {
 				data = append(data, []string{tf.Name, generation, "", ""})
 			}
 
-			pods, err := podClient.List(context.TODO(), metav1.ListOptions{
-				LabelSelector: "terraforms.tf.isaaguilar.com/resourceName=" + tf.Name,
-			})
-			if err != nil {
-				continue
-			}
 			var currentRunnerEntryIndex int
 			var previousRunnersEntryIndex int
-			for _, pod := range pods.Items {
+			for _, pod := range namespacedPods {
 				if pod.Labels["terraforms.tf.isaaguilar.com/generation"] == generation {
 					if len(data) == data_index+currentRunnerEntryIndex {
 						if allNamespaces {
