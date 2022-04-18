@@ -8,19 +8,17 @@ A CLI tool to aid in discovering TFO managed pods and running debug sessions
 
 **Binary files will be created when the cli is released**
 
+Requires golang 1.17
+
 You can manually build the project by:
 
-0. Requires golang 1.17
-1. Download the repo https://github.com/isaaguilar/terraform-operator
-2. Checkout the `kubectl-tfo` branch
-3. Change directories into `cli`
-4. Run the `go build` command
+
+1. Download the repo https://github.com/isaaguilar/terraform-operator-cli
+2. Run the `go build` command
 
 ```bash
-git clone https://github.com/isaaguilar/terraform-operator.git
-cd terraform-operator
-git checkout kubectl-tfo
-cd cli
+git clone https://github.com/isaaguilar/terraform-operator-cli.git
+cd terraform-operator-cli
 go build -o tfo main.go
 mv tfo /usr/local/bin
 ```
@@ -30,9 +28,9 @@ mv tfo /usr/local/bin
 
 Run `tfo help` for all options.
 
-### Show tfo resources
+### `tfo show`
 
-See the tfo resources in a namespace by running `tfo show`
+Shows tfo resources. See the tfo resources in a namespace by running `tfo show`
 
 ```bash
 tfo show
@@ -44,7 +42,9 @@ or
 tfo show --namespace foo
 ```
 
-### Open a **debug** session
+### `tfo debug` 
+
+Opens a **debug** session.
 
 ```bash
 tfo debug <tf-resource-name>
