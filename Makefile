@@ -6,7 +6,7 @@ VERSION := v0.0.0
 endif
 RELEASES := .rmgmt/releases/${VERSION}
 
-all: clean run
+all: release
 
 check-version:
 	echo ${VERSION}
@@ -23,11 +23,4 @@ build: check-version
 release: build
 	/bin/bash hack/release.sh
 
-run: build
-
-
-
-clean:
-	-@rm ${OUT} ${OUT}-v*
-
-.PHONY: run build
+.PHONY: build release

@@ -101,7 +101,7 @@ var (
 		// 		Long: ``,
 		Args: cobra.MaximumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			show("name", false)
+			show("name", allNamespaces, false)
 			// fmt.Println("showing")
 		},
 	}
@@ -133,12 +133,16 @@ var (
 	session    Session
 	kubeconfig string
 	namespace  string
+
+	// show only flags
+	allNamespaces bool
 )
 
 func init() {
 	cobra.OnInitialize(newSession)
 	getKubeconfig()
 	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to add Kubernetes creds secret")
+	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "", false, "Show tfo resources for all namespaces")
 	rootCmd.AddCommand(versionCmd, showCmd, debugCmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
@@ -166,22 +170,93 @@ func er(msg interface{}) {
 	os.Exit(1)
 }
 
-func show(name string, showPrevious bool) {
-	tfClient := session.tfoclientset.TfV1alpha1().Terraforms(session.namespace)
-	podClient := session.clientset.CoreV1().Pods(session.namespace)
+func show(name string, allNamespaces, showPrevious bool) {
+	var data [][]string
+	var header []string
 
-	tfs, err := tfClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		log.Fatal(nil)
+	var namespaces []string
+	if allNamespaces {
+		header = []string{"Namespace", "Name", "Generation", "Pods"}
+		namespaceClient := session.clientset.CoreV1().Namespaces()
+		namespaceList, err := namespaceClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, namespace := range namespaceList.Items {
+			namespaces = append(namespaces, namespace.Name)
+		}
+	} else {
+		header = []string{"Name", "Generation", "Pods"}
+		namespaces = []string{session.namespace}
 	}
 
-	var data [][]string
-	header := []string{"Name", "Generation", "Pods"}
+	for _, namespace := range namespaces {
+		tfClient := session.tfoclientset.TfV1alpha1().Terraforms(namespace)
+		podClient := session.clientset.CoreV1().Pods(namespace)
+
+		tfs, err := tfClient.List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatal(nil)
+		}
+
+		for _, tf := range tfs.Items {
+			data_index := len(data)
+			generation := fmt.Sprintf("%d", tf.Generation)
+
+			podsIndex := 2
+			previousPodsIndex := 3
+
+			if allNamespaces {
+				podsIndex = podsIndex + 1
+				previousPodsIndex = previousPodsIndex + 1
+				data = append(data, []string{namespace, tf.Name, generation, "", ""})
+			} else {
+				data = append(data, []string{tf.Name, generation, "", ""})
+			}
+
+			pods, err := podClient.List(context.TODO(), metav1.ListOptions{
+				LabelSelector: "terraforms.tf.isaaguilar.com/resourceName=" + tf.Name,
+			})
+			if err != nil {
+				continue
+			}
+			var currentRunnerEntryIndex int
+			var previousRunnersEntryIndex int
+			for _, pod := range pods.Items {
+				if pod.Labels["terraforms.tf.isaaguilar.com/generation"] == generation {
+					if len(data) == data_index+currentRunnerEntryIndex {
+						if allNamespaces {
+							data = append(data, []string{"", "", "", pod.Name, ""})
+						} else {
+							data = append(data, []string{"", "", pod.Name, ""})
+						}
+
+					} else {
+						data[data_index+currentRunnerEntryIndex][podsIndex] = pod.Name
+					}
+
+					currentRunnerEntryIndex++
+				} else if showPrevious {
+					if len(data) == data_index+previousRunnersEntryIndex {
+						if allNamespaces {
+							data = append(data, []string{"", "", "", "", pod.Name})
+						} else {
+							data = append(data, []string{"", "", "", pod.Name})
+						}
+					} else {
+						data[data_index+previousRunnersEntryIndex][previousPodsIndex] = pod.Name
+					}
+
+					previousRunnersEntryIndex++
+				}
+			}
+		}
+	}
+
 	if showPrevious {
 		header = append(header, "PreviousPods")
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(header)
 	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
@@ -193,40 +268,7 @@ func show(name string, showPrevious bool) {
 	table.SetBorder(false)
 	table.SetTablePadding("\t") // pad with tabs
 	table.SetNoWhiteSpace(true)
-
-	for _, tf := range tfs.Items {
-		data_index := len(data)
-		generation := fmt.Sprintf("%d", tf.Generation)
-		data = append(data, []string{tf.Name, generation, "", ""})
-
-		pods, err := podClient.List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "terraforms.tf.isaaguilar.com/resourceName=" + tf.Name,
-		})
-		if err != nil {
-			continue
-		}
-		var currentRunnerEntryIndex int
-		var previousRunnersEntryIndex int
-		for _, pod := range pods.Items {
-			if pod.Labels["terraforms.tf.isaaguilar.com/generation"] == generation {
-				if len(data) == data_index+currentRunnerEntryIndex {
-					data = append(data, []string{"", "", pod.Name, ""})
-				} else {
-					data[data_index+currentRunnerEntryIndex][2] = pod.Name
-				}
-
-				currentRunnerEntryIndex++
-			} else if showPrevious {
-				if len(data) == data_index+previousRunnersEntryIndex {
-					data = append(data, []string{"", "", "", pod.Name})
-				} else {
-					data[data_index+previousRunnersEntryIndex][3] = pod.Name
-				}
-
-				previousRunnersEntryIndex++
-			}
-		}
-	}
+	table.SetHeader(header)
 	table.AppendBulk(data)
 	table.Render()
 
