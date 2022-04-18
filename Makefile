@@ -4,24 +4,24 @@ VERSION ?= $(shell git ls-remote .|grep $$(git rev-parse HEAD).*tags|head -n1|se
 ifeq ($(VERSION),)
 VERSION := v0.0.0
 endif
-OS := $(shell uname -s | tr A-Z a-z)
+RELEASES := .rmgmt/releases/${VERSION}
 
 all: clean run
-
-arch-envs:
-DARWIN_AMD = "darwin-amd64"
-LINUX_AMD = "linux-amd64"
-LINUX_ARM = "linux-arm64"
-
 
 check-version:
 	echo ${VERSION}
 
-build:
-	env GOOS=${DARWIN_AMD} GOARCH=amd64 go build -i -v -o ${OUT}-${DARWIN_AMD} -ldflags="-X main.version=${VERSION}" ${PKG}
-	env GOOS=${LINUX_AMD} GOARCH=amd64 go build -i -v -o ${OUT}-${LINUX_AMD} -ldflags="-X main.version=${VERSION}" ${PKG}
-	env GOOS=${LINUX_ARM} GOARCH=amd64 go build -i -v -o ${OUT}-${LINUX_ARM} -ldflags="-X main.version=${VERSION}" ${PKG}
+build: check-version
+	mkdir ${RELEASES}
+	env GOOS=darwin GOARCH=amd64 go build -v -o ${RELEASES}/${OUT}-darwin-amd64 -ldflags="-X main.version=${VERSION}" ${PKG}
+	env GOOS=linux GOARCH=amd64 go build -v -o ${RELEASES}/${OUT}-linux-amd64 -ldflags="-X main.version=${VERSION}" ${PKG}
+	env GOOS=linux GOARCH=arm64 go build -v -o ${RELEASES}/${OUT}-linux-arm64 -ldflags="-X main.version=${VERSION}" ${PKG}
+	mv ${RELEASES}/${OUT}-linux-amd64 ${RELEASES}/${OUT} && cd ${RELEASES} && tar czf ${OUT}-${VERSION}-linux-amd64.tgz ${OUT}
+	mv ${RELEASES}/${OUT}-linux-arm64 ${RELEASES}/${OUT} && cd ${RELEASES} && tar czf ${OUT}-${VERSION}-linux-arm64.tgz ${OUT}
+	mv ${RELEASES}/${OUT}-darwin-amd64 ${RELEASES}/${OUT} && cd ${RELEASES} && tar czf ${OUT}-${VERSION}-darwin-amd64.tgz ${OUT}
 
+release: build
+	/bin/bash hack/release.sh
 
 
 # update-installer:
@@ -30,12 +30,7 @@ build:
 # 	curl -H "X-JFrog-Art-Api:${ARTIFACTORY_TOKEN}" -T ./install-opsbox.sh "https://artifactory.bf-aws.illumina.com/artifactory/archive-eibu-internal/opsbox/install-opsbox.sh"
 
 run: build
-	[[ ${OS} == "${LINUX_AMD}"* ]] && ./${OUT}-${LINUX_AMD} version ||:
-	[[ ${OS} == "${LINUX_ARM}"* ]] && ./${OUT}-${LINUX_ARM} version ||:
-	[[ ${OS} == "${DARWIN_AMD}"* ]] && ./${OUT}-${DARWIN_AMD} version ||:
-	mv ./${OUT}-${LINUX_AMD} ./${OUT} && tar czf ${OUT}-${VERSION}-${LINUX_AMD}.tgz ${OUT}
-	mv ./${OUT}-${LINUX_ARM} ./${OUT} && tar czf ${OUT}-${VERSION}-${LINUX_ARM}.tgz ${OUT}
-	mv ./${OUT}-${DARWIN_AMD} ./${OUT} && tar czf ${OUT}-${VERSION}-${DARWIN_AMD}.tgz ${OUT}
+
 
 
 clean:

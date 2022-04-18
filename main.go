@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/isaaguilar/terraform-operator/cli/cmd"
+	"github.com/isaaguilar/terraform-operator-cli/cmd"
 )
 
 var version string

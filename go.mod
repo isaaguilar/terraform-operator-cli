@@ -1,4 +1,4 @@
-module github.com/isaaguilar/terraform-operator/cli
+module github.com/isaaguilar/terraform-operator-cli
 
 go 1.17
 
