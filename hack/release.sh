@@ -24,4 +24,4 @@ cat ".rmgmt/changelogs/next.md" >> "$changelog"
 git push origin tag $VERSION
 gh release create $VERSION -t "$VERSION release" -F "$changelog" .rmgmt/releases/$VERSION/*.tgz
 
-md5 .rmgmt/changelogs/next.md > .rmgmt/_lastsha
+md5 .rmgmt/changelogs/next.md > .rmgmt/_lasthash

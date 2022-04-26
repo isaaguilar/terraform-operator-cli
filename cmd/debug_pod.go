@@ -163,9 +163,9 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 	containers = append(containers, corev1.Container{
 		SecurityContext: securityContext,
 		Name:            "debug",
-		Image:           "isaaguilar/tf-runner-v5beta1:" + terraformVersion,
+		Image:           "isaaguilar/tf-runner-v5beta2:" + terraformVersion,
 		Command: []string{
-			"/bin/sleep", "600",
+			"/bin/sleep", "86400",
 		},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		EnvFrom:         envFrom,
