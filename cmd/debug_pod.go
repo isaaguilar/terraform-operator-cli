@@ -3,12 +3,12 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha1"
+	"github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
+func generatePod(tf *v1alpha2.Terraform) *corev1.Pod {
 	terraformVersion := tf.Spec.TerraformVersion
 	if terraformVersion == "" {
 		terraformVersion = "1.1.5"
@@ -17,10 +17,26 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 	versionedName := tf.Status.PodNamePrefix + "-v" + generation
 	generateName := versionedName + "-debug-"
 	generationPath := "/home/tfo-runner/generations/" + generation
-	envs := tf.Spec.Env
-	envs = append(envs, []corev1.EnvVar{
+	env := []corev1.EnvVar{}
+	envFrom := []corev1.EnvFromSource{}
+	annotations := make(map[string]string)
+	labels := make(map[string]string)
+
+	for _, taskOption := range tf.Spec.TaskOptions {
+		if v1alpha2.ListContainsRunType(taskOption.TaskTypes, "*") {
+			env = append(env, taskOption.Env...)
+			envFrom = append(envFrom, taskOption.EnvFrom...)
+			for key, value := range taskOption.Annotations {
+				annotations[key] = value
+			}
+			for key, value := range taskOption.Labels {
+				labels[key] = value
+			}
+		}
+	}
+	env = append(env, []corev1.EnvVar{
 		{
-			Name:  "TFO_RUNNER",
+			Name:  "TFO_TASK",
 			Value: "debug",
 		},
 		{
@@ -67,7 +83,7 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 			ReadOnly:  false,
 		},
 	}
-	envs = append(envs, corev1.EnvVar{
+	env = append(env, corev1.EnvVar{
 		Name:  "TFO_ROOT_PATH",
 		Value: "/home/tfo-runner",
 	})
@@ -96,15 +112,12 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 			MountPath: "/git/askpass",
 		},
 	}...)
-	envs = append(envs, []corev1.EnvVar{
+	env = append(env, []corev1.EnvVar{
 		{
 			Name:  "GIT_ASKPASS",
 			Value: "/git/askpass/GIT_ASKPASS",
 		},
 	}...)
-
-	annotations := tf.Spec.RunnerAnnotations
-	envFrom := []corev1.EnvFromSource{}
 
 	for _, c := range tf.Spec.Credentials {
 		if c.AWSCredentials.KIAM != "" {
@@ -113,7 +126,7 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 	}
 
 	for _, c := range tf.Spec.Credentials {
-		if (v1alpha1.SecretNameRef{}) != c.SecretNameRef {
+		if (v1alpha2.SecretNameRef{}) != c.SecretNameRef {
 			envFrom = append(envFrom, []corev1.EnvFromSource{
 				{
 					SecretRef: &corev1.SecretEnvSource{
@@ -126,10 +139,6 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 		}
 	}
 
-	labels := make(map[string]string)
-	if len(tf.Spec.RunnerLabels) > 0 {
-		labels = tf.Spec.RunnerLabels
-	}
 	labels["terraforms.tf.isaaguilar.com/generation"] = generation
 	labels["terraforms.tf.isaaguilar.com/resourceName"] = tf.Name
 	labels["terraforms.tf.isaaguilar.com/podPrefix"] = tf.Status.PodNamePrefix
@@ -163,13 +172,13 @@ func generatePod(tf *v1alpha1.Terraform) *corev1.Pod {
 	containers = append(containers, corev1.Container{
 		SecurityContext: securityContext,
 		Name:            "debug",
-		Image:           "isaaguilar/tf-runner-v5beta2:" + terraformVersion,
+		Image:           "ghcr.io/galleybytes/terraform-operator-tftaskv1:" + terraformVersion,
 		Command: []string{
 			"/bin/sleep", "86400",
 		},
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		EnvFrom:         envFrom,
-		Env:             envs,
+		Env:             env,
 		VolumeMounts:    volumeMounts,
 	})
 

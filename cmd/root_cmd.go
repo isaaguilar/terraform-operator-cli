@@ -8,21 +8,22 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/cli/cli/streams"
 	"github.com/ghodss/yaml"
-	tfv1alpha1 "github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha1"
+	tfv1alpha2 "github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha2"
 	tfo "github.com/isaaguilar/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -176,7 +177,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 	var data [][]string
 	var header []string
 	var namespaces []string
-	var tfs []tfv1alpha1.Terraform
+	var tfs []tfv1alpha2.Terraform
 	var pods []corev1.Pod
 
 	if allNamespaces {
@@ -190,7 +191,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 			namespaces = append(namespaces, namespace.Name)
 		}
 
-		tfClient := session.tfoclientset.TfV1alpha1().Terraforms("")
+		tfClient := session.tfoclientset.TfV1alpha2().Terraforms("")
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -207,7 +208,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 		header = []string{"Name", "Generation", "Pods"}
 		namespaces = []string{session.namespace}
 
-		tfClient := session.tfoclientset.TfV1alpha1().Terraforms(session.namespace)
+		tfClient := session.tfoclientset.TfV1alpha2().Terraforms(session.namespace)
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -224,7 +225,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 
 	for _, namespace := range namespaces {
 
-		var namespacedTfs []tfv1alpha1.Terraform
+		var namespacedTfs []tfv1alpha2.Terraform
 		for _, tf := range tfs {
 			if tf.Namespace == namespace {
 				namespacedTfs = append(namespacedTfs, tf)
@@ -308,7 +309,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 }
 
 func debug(name string) {
-	tfClient := session.tfoclientset.TfV1alpha1().Terraforms(session.namespace)
+	tfClient := session.tfoclientset.TfV1alpha2().Terraforms(session.namespace)
 	podClient := session.clientset.CoreV1().Pods(session.namespace)
 
 	tf, err := tfClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -323,7 +324,7 @@ func debug(name string) {
 	}
 	defer podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 
-	fmt.Printf("Connecting to %s", pod.Name)
+	fmt.Printf("Connecting to %s ", pod.Name)
 
 	watcher, err := podClient.Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector: "metadata.name=" + pod.Name,
@@ -350,45 +351,69 @@ func debug(name string) {
 			// fmt.Fprintln(os.Stderr, event.Type)
 		}
 	}
-	fmt.Println()
+	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
+	streamOptions := exec.StreamOptions{
+		IOStreams: ioStreams,
+		Stdin:     true,
+		TTY:       true,
+	}
+	t := streamOptions.SetupTTY()
 
-	req := session.clientset.CoreV1().RESTClient().
-		Post().
-		Namespace(pod.Namespace).
-		Resource("pods").
-		Name(pod.Name).
-		SubResource("exec").
-		VersionedParams(&corev1.PodExecOptions{
-			Container: pod.Spec.Containers[0].Name,
-			Command: []string{
-				"/bin/bash",
-				"-c",
-				"cd $TFO_MAIN_MODULE && export PS1=\"$(pwd)\\$ \" && " +
-					"printf \"\nTry running 'terraform init'\n\n\" && bash",
-			},
-			Stdin:  true,
-			Stdout: true,
-			Stderr: true,
-			TTY:    true,
-		}, scheme.ParameterCodec)
+	var sizeQueue remotecommand.TerminalSizeQueue
+	if t.Raw {
+		// this call spawns a goroutine to monitor/update the terminal size
+		sizeQueue = t.MonitorSize(t.GetSize())
 
-	exec, err := remotecommand.NewSPDYExecutor(session.config, "POST", req.URL())
-	if err != nil {
-		panic(err)
+		// unset p.Err if it was previously set because both stdout and stderr go over p.Out when tty is
+		// true
+		streamOptions.ErrOut = nil
 	}
 
-	in := streams.NewIn(os.Stdin)
-	if err := in.SetRawTerminal(); err != nil {
+	fn := func() error {
+		req := session.clientset.CoreV1().RESTClient().
+			Post().
+			Namespace(pod.Namespace).
+			Resource("pods").
+			Name(pod.Name).
+			SubResource("exec").
+			VersionedParams(&corev1.PodExecOptions{
+				Container: pod.Spec.Containers[0].Name,
+				Command: []string{
+					"/bin/bash",
+					"-c",
+					"cd $TFO_MAIN_MODULE && export PS1=\"\\w\\$ \" && " +
+						"if [[ -n \"$AWS_WEB_IDENTITY_TOKEN_FILE\" ]];then " +
+						"export $(irsa-tokengen); " +
+						"echo printf \"\nAWS creds set from token file\n\";fi &&" +
+						"printf \"\nTry running 'terraform init'\n\n\" && bash",
+				},
+				Stdin:  streamOptions.Stdin,
+				Stdout: streamOptions.Out != nil,
+				Stderr: streamOptions.ErrOut != nil,
+				TTY:    t.Raw,
+			}, scheme.ParameterCodec)
+
+		return func() error {
+
+			exec, err := remotecommand.NewSPDYExecutor(session.config, "POST", req.URL())
+			if err != nil {
+				panic(err)
+			}
+
+			return exec.Stream(remotecommand.StreamOptions{
+				Stdin:             streamOptions.In,
+				Stdout:            streamOptions.Out,
+				Stderr:            streamOptions.ErrOut,
+				Tty:               t.Raw,
+				TerminalSizeQueue: sizeQueue,
+			})
+		}()
+
+	}
+
+	if err := t.Safe(fn); err != nil {
 		panic(err)
 	}
-	defer in.RestoreTerminal()
-
-	_ = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  in,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Tty:    true,
-	})
 
 }
 
