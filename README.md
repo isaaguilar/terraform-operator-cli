@@ -42,7 +42,7 @@ or
 tfo show --namespace foo
 ```
 
-### `tfo debug` 
+### `tfo debug`
 
 Opens a **debug** session.
 
@@ -54,13 +54,14 @@ tfo debug <tf-resource-name>
 
 ```bash
 kubectl apply --namespace default -f - << EOF
-apiVersion: tf.isaaguilar.com/v1alpha1
+apiVersion: tf.isaaguilar.com/v1alpha2
 kind: Terraform
 metadata:
   name: stable
 spec:
-  terraformModule: https://github.com/isaaguilar/simple-aws-tf-modules.git//create_file
-  customBackend: |-
+  terraformModule:
+    source: https://github.com/isaaguilar/simple-aws-tf-modules.git//create_file
+  backend: |-
     terraform {
       backend "kubernetes" {
         secret_suffix    = "stable"
