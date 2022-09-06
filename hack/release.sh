@@ -1,4 +1,28 @@
 #!/usr/bin/env zsh
+##
+## Notes to release:
+##      Step 1:
+##          Make sure all code is on origin/master and that this system has
+##          the latest origin/master checked out
+##      Step 2:
+##          Ensure that that tag variable VERSION does not exist in the repo
+##      Step 3:
+##          export VERSION
+##      Step 4:
+##          Ensure to have updated .rmgmt/changelongs/next.md with latest
+##          changelog description. The format should be:
+##
+## ---------------------------------------------------------------------
+##
+##       ### Features
+##       ### Fixes
+##       ### Changes
+##       ### Breaking Changes
+##
+## ---------------------------------------------------------------------
+##
+##      Step 5: Release! by running `make release`
+##
 set -o nounset
 set -o errexit
 set -o pipefail
