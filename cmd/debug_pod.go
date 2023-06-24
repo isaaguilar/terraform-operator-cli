@@ -3,12 +3,12 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha2"
+	tfv1beta1 "github.com/galleybytes/terraform-operator/pkg/apis/tf/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func generatePod(tf *v1alpha2.Terraform) *corev1.Pod {
+func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	terraformVersion := tf.Spec.TerraformVersion
 	if terraformVersion == "" {
 		terraformVersion = "1.1.5"
@@ -21,9 +21,8 @@ func generatePod(tf *v1alpha2.Terraform) *corev1.Pod {
 	envFrom := []corev1.EnvFromSource{}
 	annotations := make(map[string]string)
 	labels := make(map[string]string)
-
 	for _, taskOption := range tf.Spec.TaskOptions {
-		if v1alpha2.ListContainsRunType(taskOption.TaskTypes, "*") {
+		if tfv1beta1.ListContainsTask(taskOption.For, "*") {
 			env = append(env, taskOption.Env...)
 			envFrom = append(envFrom, taskOption.EnvFrom...)
 			for key, value := range taskOption.Annotations {
@@ -126,7 +125,7 @@ func generatePod(tf *v1alpha2.Terraform) *corev1.Pod {
 	}
 
 	for _, c := range tf.Spec.Credentials {
-		if (v1alpha2.SecretNameRef{}) != c.SecretNameRef {
+		if (tfv1beta1.SecretNameRef{}) != c.SecretNameRef {
 			envFrom = append(envFrom, []corev1.EnvFromSource{
 				{
 					SecretRef: &corev1.SecretEnvSource{
