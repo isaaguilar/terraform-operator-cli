@@ -21,6 +21,6 @@ build: check-version
 	mv ${RELEASES}/${OUT}-darwin-amd64 ${RELEASES}/${OUT} && cd ${RELEASES} && tar czf ${OUT}-${VERSION}-darwin-amd64.tgz ${OUT}
 
 release: build
-	/bin/bash hack/release.sh
+	./hack/release.sh
 
 .PHONY: build release

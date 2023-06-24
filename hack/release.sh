@@ -9,7 +9,7 @@
 ##      Step 3:
 ##          export VERSION
 ##      Step 4:
-##          Ensure to have updated .rmgmt/changelongs/next.md with latest
+##          Ensure to have updated .rmgmt/changelogs/next.md with latest
 ##          changelog description. The format should be:
 ##
 ## ---------------------------------------------------------------------
