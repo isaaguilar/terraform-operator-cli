@@ -171,7 +171,7 @@ func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	containers = append(containers, corev1.Container{
 		SecurityContext: securityContext,
 		Name:            "debug",
-		Image:           "ghcr.io/galleybytes/terraform-operator-tftaskv1:" + terraformVersion,
+		Image:           "ghcr.io/galleybytes/terraform-operator-tftaskv1.1.0:" + terraformVersion,
 		Command: []string{
 			"/bin/sleep", "86400",
 		},
