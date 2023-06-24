@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	tfv1beta1 "github.com/galleybytes/terraform-operator/pkg/apis/tf/v1beta1"
+	tfo "github.com/galleybytes/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/ghodss/yaml"
-	tfv1alpha2 "github.com/isaaguilar/terraform-operator/pkg/apis/tf/v1alpha2"
-	tfo "github.com/isaaguilar/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -177,7 +177,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 	var data [][]string
 	var header []string
 	var namespaces []string
-	var tfs []tfv1alpha2.Terraform
+	var tfs []tfv1beta1.Terraform
 	var pods []corev1.Pod
 
 	if allNamespaces {
@@ -191,7 +191,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 			namespaces = append(namespaces, namespace.Name)
 		}
 
-		tfClient := session.tfoclientset.TfV1alpha2().Terraforms("")
+		tfClient := session.tfoclientset.TfV1beta1().Terraforms("")
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -208,7 +208,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 		header = []string{"Name", "Generation", "Pods"}
 		namespaces = []string{session.namespace}
 
-		tfClient := session.tfoclientset.TfV1alpha2().Terraforms(session.namespace)
+		tfClient := session.tfoclientset.TfV1beta1().Terraforms(session.namespace)
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -225,7 +225,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 
 	for _, namespace := range namespaces {
 
-		var namespacedTfs []tfv1alpha2.Terraform
+		var namespacedTfs []tfv1beta1.Terraform
 		for _, tf := range tfs {
 			if tf.Namespace == namespace {
 				namespacedTfs = append(namespacedTfs, tf)
@@ -309,7 +309,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 }
 
 func debug(name string) {
-	tfClient := session.tfoclientset.TfV1alpha2().Terraforms(session.namespace)
+	tfClient := session.tfoclientset.TfV1beta1().Terraforms(session.namespace)
 	podClient := session.clientset.CoreV1().Pods(session.namespace)
 
 	tf, err := tfClient.Get(context.TODO(), name, metav1.GetOptions{})
