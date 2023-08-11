@@ -82,6 +82,7 @@ require (
 )
 
 require (
+	github.com/creack/pty v1.1.18
 	github.com/galleybytes/terraform-operator v0.12.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
