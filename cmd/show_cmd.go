@@ -23,7 +23,7 @@ var showCmd = &cobra.Command{
 }
 
 func init() {
-	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "", false, "Show tfo resources for all namespaces")
+	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "Show tfo resources for all namespaces")
 	rootCmd.AddCommand(showCmd)
 }
 

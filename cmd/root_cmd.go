@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 
 	tfo "github.com/galleybytes/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
@@ -15,9 +17,38 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-func Execute(v string) error {
-	version = v
-	return rootCmd.Execute()
+var (
+	rootCmd = &cobra.Command{
+		Use:     "tfo",
+		Aliases: []string{"\"kubectl tf(o)\""},
+		Short:   "Terraform Operator (tfo) CLI -- Manage TFO deployments",
+		Args:    cobra.MaximumNArgs(0),
+	}
+)
+
+var (
+	// vars used for flags
+	host          string
+	kubeconfig    string
+	namespace     string
+	tfoConfigFile string
+	clientName    string
+	token         string
+
+	session Session
+
+	// show only flags
+	allNamespaces bool
+)
+
+func init() {
+	cobra.OnInitialize(newSession)
+	getKubeconfig()
+	rootCmd.PersistentFlags().StringVar(&tfoConfigFile, "config", "", "absolute path to config file (default is $HOME/.tfo/config)")
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to add Kubernetes creds secret")
+
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 type Session struct {
@@ -28,13 +59,47 @@ type Session struct {
 }
 
 func newSession() {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		panic(err)
+	kubeConfig, _ := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	viper.SetEnvPrefix("TFO")
+	viper.AutomaticEnv()
+
+	// Load from global config first, will be ignored if does not exist
+	viper.SetConfigName("global")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("$HOME/.tfo")
+	if err := viper.ReadInConfig(); err == nil {
+		host = viper.GetString("host")
 	}
 
+	viper.SetConfigType("yaml")
+	tfoConfigFile = viper.GetString("config")
+
+	if tfoConfigFile != "" {
+		viper.SetConfigFile(tfoConfigFile)
+		tfoConfigFileType := filepath.Ext(tfoConfigFile)
+		log.Println(tfoConfigFile, tfoConfigFileType)
+		if tfoConfigFileType == "" {
+			viper.SetConfigFile(tfoConfigFileType)
+		}
+	} else {
+		// From config, get any values to use as a default or fallback
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("$HOME/.tfo")
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Println(err)
+	}
+
+	// Config file found and successfully parsed
+
 	// Get the namespace from the user's contexts when not passed in via flag
-	if namespace == "" {
+	if kubeConfig != nil && namespace == "" {
 		// Define the schema of the kubeconfig that is meaningful to extract
 		// the current-context's namespace (if defined)
 		type kubecfgContext struct {
@@ -66,51 +131,28 @@ func newSession() {
 		}
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err)
+	if kubeConfig != nil {
+
+		clientset, err := kubernetes.NewForConfig(kubeConfig)
+		if err != nil {
+			panic(err)
+		}
+
+		tfoclientset, err := tfo.NewForConfig(kubeConfig)
+		if err != nil {
+			panic(err)
+		}
+		session.clientset = clientset
+		session.tfoclientset = tfoclientset
+		session.namespace = namespace
+		session.config = kubeConfig
 	}
 
-	tfoclientset, err := tfo.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
-
-	session.clientset = clientset
-	session.tfoclientset = tfoclientset
-	session.namespace = namespace
-	session.config = config
-}
-
-var (
-	rootCmd = &cobra.Command{
-		Use:     "tfo",
-		Aliases: []string{"\"kubectl tf(o)\""},
-		Short:   "Terraform Operator (tfo) CLI -- Manage TFO deployments",
-		Args:    cobra.MaximumNArgs(0),
-	}
-)
-
-var (
-	// vars used for flags
-	session    Session
-	kubeconfig string
-	namespace  string
-
-	// show only flags
-	allNamespaces bool
-)
-
-func init() {
-	cobra.OnInitialize(newSession)
-	getKubeconfig()
-	rootCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to add Kubernetes creds secret")
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 func getKubeconfig() {
 	if home := homedir.HomeDir(); home != "" {
-		rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubecfg", "c", "", "(optional) absolute path to the kubeconfig file")
+		rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubecfg", "", "", "(optional) absolute path to the kubeconfig file")
 		if kubeconfig == "" {
 			kubeconfig = os.Getenv("KUBECONFIG")
 			if kubeconfig == "" {
@@ -118,10 +160,15 @@ func getKubeconfig() {
 			}
 		}
 	} else {
-		rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubecfg", "c", "", "absolute path to the kubeconfig file")
+		rootCmd.PersistentFlags().StringVarP(&kubeconfig, "kubecfg", "", "", "absolute path to the kubeconfig file")
 		if kubeconfig == "" {
 			kubeconfig = os.Getenv("KUBECONFIG")
 		}
 	}
 
+}
+
+func Execute(v string) error {
+	version = v
+	return rootCmd.Execute()
 }
