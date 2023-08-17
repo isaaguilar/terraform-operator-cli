@@ -34,6 +34,12 @@ func init() {
 }
 
 func debug(name string) {
+	if session.clientset == nil {
+		log.Fatal("KUBECONFIG is not valid")
+	}
+	if session.tfoclientset == nil {
+		log.Fatal("Cluster does not have Terraforms resource")
+	}
 	tfClient := session.tfoclientset.TfV1beta1().Terraforms(session.namespace)
 	podClient := session.clientset.CoreV1().Pods(session.namespace)
 
