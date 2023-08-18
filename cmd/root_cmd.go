@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tfo "github.com/galleybytes/terraform-operator/pkg/client/clientset/versioned"
 	"github.com/ghodss/yaml"
@@ -93,10 +95,18 @@ func newSession() {
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("$HOME/.tfo")
+		if home := homedir.HomeDir(); home != "" {
+			tfoConfigFile = filepath.Join(home, ".tfo", "config")
+		}
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		log.Println(err)
+	if readErr := viper.ReadInConfig(); readErr != nil {
+
+		err := createConfigFile(tfoConfigFile)
+		if err != nil {
+			log.Print(err)
+			os.Exit(0)
+		}
 	}
 
 	// Config file found and successfully parsed
@@ -168,6 +178,48 @@ func getKubeconfig() {
 			kubeconfig = os.Getenv("KUBECONFIG")
 		}
 	}
+
+}
+
+func createConfigFile(name string) error {
+	if name == "" {
+		return fmt.Errorf("no config file defined")
+	}
+	fileInfo, err := os.Stat(name)
+
+	if err != nil {
+		createCh := make(chan bool)
+		go func() {
+			for {
+				var stringbool string
+				fmt.Printf("Do you want to create '%s' (Y/n): ", name)
+				fmt.Scanln(&stringbool)
+
+				if strings.HasPrefix(strings.ToLower(stringbool), "y") {
+					createCh <- true
+					return
+				}
+				if strings.HasPrefix(strings.ToLower(stringbool), "n") {
+					createCh <- false
+					return
+				}
+
+			}
+		}()
+
+		create := <-createCh
+		if !create {
+			return fmt.Errorf("select a config file with `--config`")
+		}
+		_, err = os.Create(name)
+		return err
+
+	}
+
+	if fileInfo.IsDir() {
+		return fmt.Errorf("config file %s expected a file but is a dir", name)
+	}
+	return nil
 
 }
 
