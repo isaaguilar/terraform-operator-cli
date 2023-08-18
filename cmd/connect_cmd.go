@@ -24,6 +24,7 @@ var connectCmd = &cobra.Command{
 	// Args: cobra.MaximumNArgs(1),
 	// Args: cobra.ExactArgs(1),
 	PreRunE: func(cmd *cobra.Command, args []string) error {
+		viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 		host = viper.GetString("host")
 		if host == "" {
 			return fmt.Errorf("`--host` is required")
@@ -38,19 +39,22 @@ var connectCmd = &cobra.Command{
 }
 
 func init() {
-	connectCmd.Flags().StringVarP(&host, "host", "", "", "what is foo?")
-	viper.BindPFlag("host", connectCmd.Flags().Lookup("host"))
+	connectCmd.Flags().StringVarP(&host, "host", "H", "", "Terraform-Operator API URL")
+	connectCmd.Flags().StringVarP(&username, "username", "U", "", "Username of the API")
+	viper.BindPFlag("username", connectCmd.Flags().Lookup("username"))
 	rootCmd.AddCommand(connectCmd)
 }
 
 func connect(url string) {
-	username := viper.GetString("username")
+	username = viper.GetString("username")
 	if username == "" {
 		fmt.Print("Login username: ")
 		fmt.Scanln(&username)
+	} else {
+		fmt.Printf("(Username %s)\n", username)
 	}
 	var password []byte
-	password = []byte(viper.GetString("password"))
+	password = []byte(viper.GetString("password")) // Not a very smart place to put a password...
 	if len(password) == 0 {
 		fmt.Print("Login password: ")
 		p, err := xterm.ReadPassword(int(os.Stdin.Fd()))
@@ -87,7 +91,7 @@ func connect(url string) {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		// Handle error
+		log.Fatal(err)
 	}
 
 	var respData api.Response
