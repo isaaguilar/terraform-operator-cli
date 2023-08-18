@@ -34,6 +34,7 @@ var (
 	tfoConfigFile string
 	clientName    string
 	token         string
+	username      string
 
 	session Session
 
@@ -72,7 +73,9 @@ func newSession() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("$HOME/.tfo")
 	if err := viper.ReadInConfig(); err == nil {
-		host = viper.GetString("host")
+		if host == "" {
+			host = viper.GetString("host")
+		}
 	}
 
 	viper.SetConfigType("yaml")

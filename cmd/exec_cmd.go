@@ -29,6 +29,7 @@ var execCmd = &cobra.Command{
 	Short: "Launch a debug session",
 	Long:  "Create a debug pod via the API and interact via webtty",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
+		viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 		host = viper.GetString("host")
 		if host == "" {
 			return fmt.Errorf("`--host` is required")
@@ -52,7 +53,6 @@ var execCmd = &cobra.Command{
 func init() {
 	execCmd.Flags().StringVarP(&host, "host", "", "", "Terraform-Operator API URL")
 	execCmd.Flags().StringVarP(&clientName, "client", "c", "", "The client identifier")
-	viper.BindPFlag("host", execCmd.Flags().Lookup("host"))
 	rootCmd.AddCommand(execCmd)
 }
 
@@ -97,7 +97,7 @@ func TerminalWebsocket(name string) (isDone bool) {
 		"Token": {token},
 	}
 
-	log.Printf("Connection Info:\n")
+	log.Printf("-Connection Info-\n")
 	log.Printf("Host: %s\n", URL.Host)
 	log.Printf("Client: %s\n", clientName)
 	log.Printf("Namespace: %s\n", namespace)
@@ -107,17 +107,16 @@ func TerminalWebsocket(name string) (isDone bool) {
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	conn, resp, err := dialer.Dial(wsURL, headers)
 	if err != nil && resp != nil {
-		if resp.StatusCode == 401 {
-			defer resp.Body.Close()
-			data, _ := io.ReadAll(resp.Body)
-			var apiResponse api.Response
-			err = json.Unmarshal(data, &apiResponse)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Fatal(apiResponse.StatusInfo.Message)
+
+		defer resp.Body.Close()
+		data, _ := io.ReadAll(resp.Body)
+		var apiResponse api.Response
+		err = json.Unmarshal(data, &apiResponse)
+		if err != nil {
+			log.Fatal(err)
 		}
-		log.Fatal("dial:", err)
+		log.Fatal(apiResponse.StatusInfo.Message)
+
 	} else if err != nil {
 		log.Fatal(err)
 	}
@@ -127,26 +126,24 @@ func TerminalWebsocket(name string) (isDone bool) {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	// Create a channel for done signal
-	done := make(chan struct{})
+	// Create a channel for closer signal
+	closer := make(chan error)
 
 	// Start a goroutine to read messages from the WebSocket connection
 	go func() {
-		defer close(done)
+		defer close(closer)
 		for {
 			// Read a message
 			mt, bmsg, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("read:", err)
+				if strings.Contains(err.Error(), "close 1000") {
+					closer <- nil
+				}
+				closer <- err
 				return
 			}
-			// fmt.Printf("Received: %s\n", bmsg)
-			// digit1, err := b64.StdEncoding.DecodeString(string(bmsg[1]))
-			// if err != nil {
-			// 	log.Println(err)
-			// }
-			// fmt.Printf("Received: %s\n", string(digit1))
-			if mt == websocket.TextMessage {
+			switch mt {
+			case websocket.TextMessage:
 				msg := string(bmsg)
 				if strings.HasPrefix(msg, "2") {
 					// log.Println("PONG!")
@@ -158,20 +155,21 @@ func TerminalWebsocket(name string) (isDone bool) {
 				if strings.HasPrefix(msg, "6") {
 					continue
 				}
-
 				dec, err := base64.StdEncoding.DecodeString(string(msg[1:]))
 				if err != nil {
 					log.Println(err)
 					continue
 				}
 				fmt.Printf("%s", string(dec))
-
-			} else {
-
+			case websocket.CloseMessage:
+				return
+			default:
 				fmt.Printf("The MessageType: %+v\n", mt)
 				// Print the message to the standard output
 				fmt.Printf("Received: %s\n", bmsg)
+				return
 			}
+
 		}
 	}()
 
@@ -199,7 +197,10 @@ func TerminalWebsocket(name string) (isDone bool) {
 			}
 			continue
 
-		case <-done:
+		case err := <-closer:
+			if err != nil {
+				log.Fatal(err)
+			}
 			return
 		case <-interrupt:
 			// Send a close message to the WebSocket server
@@ -211,7 +212,7 @@ func TerminalWebsocket(name string) (isDone bool) {
 			}
 			// Wait for the server to close the connection
 			select {
-			case <-done:
+			case <-closer:
 			case <-time.After(time.Second):
 			}
 			return
@@ -237,7 +238,7 @@ func TerminalWebsocket(name string) (isDone bool) {
 						return
 					}
 				}
-				ctrlCExit = false
+				ctrlCExit = false // Set to true - useful for debugging
 			} else {
 				ctrlCExit = false
 			}
@@ -246,6 +247,9 @@ func TerminalWebsocket(name string) (isDone bool) {
 
 			var byteArr []byte
 			if key != 0 {
+				// TODO Arrow keys and special keys might depend on the "term" type. For example,
+				// arrows do not work properly in a "screen" term. Fix special characters based
+				// on the term type.
 				switch key {
 				case keyboard.KeyArrowUp:
 					byteArr = []byte{27, 91, 65}
