@@ -30,7 +30,7 @@ var debugCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(debugCmd)
+	localCmd.AddCommand(debugCmd)
 }
 
 func debug(name string) {

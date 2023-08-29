@@ -24,7 +24,12 @@ var showCmd = &cobra.Command{
 
 func init() {
 	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "Show tfo resources for all namespaces")
-	rootCmd.AddCommand(showCmd)
+	//
+	// TODO the show command is broken and needs works. Perhaps "show" should be "list"
+	// Other ideas might be that "list tf" to lists the terraform resources (ie kubectl get tf)
+	// and "list pods" would be what "show" was supposed to do. Anyways, for now I'm going to abandon ship here.
+	//
+	// localCmd.AddCommand(showCmd)
 }
 
 func show(name string, allNamespaces, showPrevious bool) {

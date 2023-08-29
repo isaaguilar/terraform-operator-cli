@@ -62,10 +62,6 @@ type Session struct {
 }
 
 func newSession() {
-	kubeConfig, _ := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	viper.SetEnvPrefix("TFO")
 	viper.AutomaticEnv()
@@ -101,7 +97,6 @@ func newSession() {
 	}
 
 	if readErr := viper.ReadInConfig(); readErr != nil {
-
 		err := createConfigFile(tfoConfigFile)
 		if err != nil {
 			log.Print(err)
@@ -112,6 +107,7 @@ func newSession() {
 	// Config file found and successfully parsed
 
 	// Get the namespace from the user's contexts when not passed in via flag
+	kubeConfig, _ := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if kubeConfig != nil && namespace == "" {
 		// Define the schema of the kubeconfig that is meaningful to extract
 		// the current-context's namespace (if defined)
@@ -210,6 +206,10 @@ func createConfigFile(name string) error {
 		create := <-createCh
 		if !create {
 			return fmt.Errorf("select a config file with `--config`")
+		}
+		err = os.MkdirAll(filepath.Dir(name), 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create dir: %s", err)
 		}
 		_, err = os.Create(name)
 		return err
