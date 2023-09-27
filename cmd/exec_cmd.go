@@ -43,9 +43,11 @@ var execCmd = &cobra.Command{
 		}
 		return nil
 	},
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-
+		if len(args) > 1 {
+			command = args[1:]
+		}
 		TerminalWebsocket(args[0])
 	},
 }
@@ -93,6 +95,16 @@ func TerminalWebsocket(name string) (isDone bool) {
 	}
 
 	wsURL := fmt.Sprintf("%s://%s/api/v1/cluster/%s/debug/%s/%s", scheme, URL.Host, clientName, namespace, name)
+	if len(command) > 0 {
+		query := ""
+		for _, i := range command {
+			if query != "" {
+				query += "&"
+			}
+			query += url.PathEscape(fmt.Sprintf("command=%s", i))
+		}
+		wsURL += fmt.Sprintf("?%s", query)
+	}
 	headers := http.Header{
 		"Token": {token},
 	}

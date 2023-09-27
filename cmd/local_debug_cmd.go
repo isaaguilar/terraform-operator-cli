@@ -22,9 +22,12 @@ var debugCmd = &cobra.Command{
 	Short: "Debug a tf workflow by exec into a session",
 	// 		Long: ``,
 	// Args: cobra.MaximumNArgs(1),
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
+		if len(args) > 1 {
+			command = args[1:]
+		}
 		debug(name)
 	},
 }
@@ -100,6 +103,23 @@ func debug(name string) {
 		streamOptions.ErrOut = nil
 	}
 
+	execCommand := []string{
+		"/bin/bash",
+		"-c",
+		`cd $TFO_MAIN_MODULE && \
+			export PS1="\\w\\$ " && \
+			if [[ -n "$AWS_WEB_IDENTITY_TOKEN_FILE" ]]; then
+				export $(irsa-tokengen);
+				echo printf "\nAWS creds set from token file\n"
+			fi && \
+			printf "\nTry running 'terraform init'\n\n" && bash
+		`,
+	}
+
+	if len(command) > 0 {
+		execCommand = command
+	}
+
 	fn := func() error {
 		req := session.clientset.CoreV1().RESTClient().
 			Post().
@@ -109,19 +129,11 @@ func debug(name string) {
 			SubResource("exec").
 			VersionedParams(&corev1.PodExecOptions{
 				Container: pod.Spec.Containers[0].Name,
-				Command: []string{
-					"/bin/bash",
-					"-c",
-					"cd $TFO_MAIN_MODULE && export PS1=\"\\w\\$ \" && " +
-						"if [[ -n \"$AWS_WEB_IDENTITY_TOKEN_FILE\" ]];then " +
-						"export $(irsa-tokengen); " +
-						"echo printf \"\nAWS creds set from token file\n\";fi &&" +
-						"printf \"\nTry running 'terraform init'\n\n\" && bash",
-				},
-				Stdin:  streamOptions.Stdin,
-				Stdout: streamOptions.Out != nil,
-				Stderr: streamOptions.ErrOut != nil,
-				TTY:    t.Raw,
+				Command:   execCommand,
+				Stdin:     streamOptions.Stdin,
+				Stdout:    streamOptions.Out != nil,
+				Stderr:    streamOptions.ErrOut != nil,
+				TTY:       t.Raw,
 			}, scheme.ParameterCodec)
 
 		return func() error {

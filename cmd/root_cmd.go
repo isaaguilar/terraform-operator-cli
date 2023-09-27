@@ -37,6 +37,7 @@ var (
 	clientName    string
 	token         string
 	username      string
+	command       []string
 
 	session Session
 
