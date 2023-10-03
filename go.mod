@@ -112,7 +112,7 @@ require (
 require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
-	github.com/galleybytes/terraform-operator v0.12.1
+	github.com/galleybytes/terraform-operator v0.14.0
 	github.com/galleybytes/terraform-operator-api v0.0.0-20230609023645-a88fb49e80cc
 	github.com/ghodss/yaml v1.0.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
