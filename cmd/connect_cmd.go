@@ -204,7 +204,7 @@ func ssoConnecter(host string) (string, error) {
 	tokenCh := make(chan string)
 	errorCh := make(chan error)
 
-	router.POST("/connecter", func(c *gin.Context) {
+	router.Any("/connecter", func(c *gin.Context) {
 		token := c.Query("token")
 		defer func() {
 			stopCh <- true
@@ -214,7 +214,7 @@ func ssoConnecter(host string) (string, error) {
 			c.AbortWithError(http.StatusNotFound, fmt.Errorf("failed to get token"))
 			return
 		}
-		fmt.Fprintln(c.Writer, "")
+		fmt.Fprintln(c.Writer, " success!") // Response to send to caller
 	})
 
 	go func() {
