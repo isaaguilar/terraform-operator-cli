@@ -1,6 +1,12 @@
 #!/usr/bin/env zsh
 ##
 ## Notes to release:
+##      Step 0: 
+##          0.1. Create directories and files:
+##               >_ mkdir .rmgmt/changelogs/releases
+##               >_ touch .rmgmt/changelogs/next.md
+##               >_ touch .rmgmt/_lasthash
+##          0.2. Authenticate the `gh` cli tool
 ##      Step 1:
 ##          Make sure all code is on origin/master and that this system has
 ##          the latest origin/master checked out
