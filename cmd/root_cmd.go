@@ -103,6 +103,9 @@ func newSession() {
 			log.Print(err)
 			os.Exit(0)
 		}
+		if readErr := viper.ReadInConfig(); readErr != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Config file found and successfully parsed
