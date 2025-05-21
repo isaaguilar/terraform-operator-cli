@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	tfv1beta1 "github.com/galleybytes/terraform-operator/pkg/apis/tf/v1beta1"
+	tfv1beta1 "github.com/galleybytes/infrakube/pkg/apis/infra3/v1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,10 +40,10 @@ func debug(name string) {
 	if session.clientset == nil {
 		log.Fatal("KUBECONFIG is not valid")
 	}
-	if session.tfoclientset == nil {
+	if session.infrakubeclientset == nil {
 		log.Fatal("Cluster does not have Terraforms resource")
 	}
-	tfClient := session.tfoclientset.TfV1beta1().Terraforms(session.namespace)
+	tfClient := session.infrakubeclientset.Infra3V1().Tfs(session.namespace)
 	podClient := session.clientset.CoreV1().Pods(session.namespace)
 
 	tf, err := tfClient.Get(context.TODO(), name, metav1.GetOptions{})
@@ -106,7 +106,7 @@ func debug(name string) {
 	execCommand := []string{
 		"/bin/bash",
 		"-c",
-		`cd $TFO_MAIN_MODULE && \
+		`cd $I3_MAIN_MODULE && \
 			export PS1="\\w\\$ " && \
 			if [[ -n "$AWS_WEB_IDENTITY_TOKEN_FILE" ]]; then
 				export $(irsa-tokengen);
@@ -160,15 +160,15 @@ func debug(name string) {
 
 }
 
-func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
-	terraformVersion := tf.Spec.TerraformVersion
+func generatePod(tf *tfv1beta1.Tf) *corev1.Pod {
+	terraformVersion := tf.Spec.TfVersion
 	if terraformVersion == "" {
 		terraformVersion = "1.1.5"
 	}
 	generation := fmt.Sprint(tf.Generation)
 	versionedName := tf.Status.PodNamePrefix + "-v" + generation
 	generateName := versionedName + "-debug-"
-	generationPath := "/home/tfo-runner/generations/" + generation
+	generationPath := "/home/i3-runner/generations/" + generation
 	env := []corev1.EnvVar{}
 	envFrom := []corev1.EnvFromSource{}
 	annotations := make(map[string]string)
@@ -187,38 +187,38 @@ func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	}
 	env = append(env, []corev1.EnvVar{
 		{
-			Name:  "TFO_TASK",
+			Name:  "I3_TASK",
 			Value: "debug",
 		},
 		{
-			Name:  "TFO_RESOURCE",
+			Name:  "I3_RESOURCE",
 			Value: tf.Name,
 		},
 		{
-			Name:  "TFO_NAMESPACE",
+			Name:  "I3_NAMESPACE",
 			Value: tf.Namespace,
 		},
 		{
-			Name:  "TFO_GENERATION",
+			Name:  "I3_GENERATION",
 			Value: generation,
 		},
 		{
-			Name:  "TFO_GENERATION_PATH",
+			Name:  "I3_GENERATION_PATH",
 			Value: generationPath,
 		},
 		{
-			Name:  "TFO_MAIN_MODULE",
+			Name:  "I3_MAIN_MODULE",
 			Value: generationPath + "/main",
 		},
 		{
-			Name:  "TFO_TERRAFORM_VERSION",
-			Value: tf.Spec.TerraformVersion,
+			Name:  "I3_TERRAFORM_VERSION",
+			Value: tf.Spec.TfVersion,
 		},
 	}...)
 
 	volumes := []corev1.Volume{
 		{
-			Name: "tfohome",
+			Name: "infra3home",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: tf.Status.PodNamePrefix,
@@ -229,14 +229,14 @@ func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	}
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      "tfohome",
-			MountPath: "/home/tfo-runner",
+			Name:      "infra3home",
+			MountPath: "/home/i3-runner",
 			ReadOnly:  false,
 		},
 	}
 	env = append(env, corev1.EnvVar{
-		Name:  "TFO_ROOT_PATH",
-		Value: "/home/tfo-runner",
+		Name:  "I3_ROOT_PATH",
+		Value: "/home/i3-runner",
 	})
 
 	optional := true
@@ -293,9 +293,9 @@ func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	labels["terraforms.tf.isaaguilar.com/generation"] = generation
 	labels["terraforms.tf.isaaguilar.com/resourceName"] = tf.Name
 	labels["terraforms.tf.isaaguilar.com/podPrefix"] = tf.Status.PodNamePrefix
-	labels["terraforms.tf.isaaguilar.com/terraformVersion"] = tf.Spec.TerraformVersion
-	labels["app.kubernetes.io/name"] = "terraform-operator"
-	labels["app.kubernetes.io/component"] = "terraform-operator-cli"
+	labels["terraforms.tf.isaaguilar.com/tfVersion"] = tf.Spec.TfVersion
+	labels["app.kubernetes.io/name"] = "infrakube"
+	labels["app.kubernetes.io/component"] = "infrakube-cli"
 	labels["app.kubernetes.io/instance"] = "debug"
 	labels["app.kubernetes.io/created-by"] = "cli"
 
@@ -323,7 +323,7 @@ func generatePod(tf *tfv1beta1.Terraform) *corev1.Pod {
 	containers = append(containers, corev1.Container{
 		SecurityContext: securityContext,
 		Name:            "debug",
-		Image:           "ghcr.io/galleybytes/terraform-operator-tftaskv1.1.0:" + terraformVersion,
+		Image:           "ghcr.io/galleybytes/infra3-tftask-v1:" + terraformVersion,
 		Command: []string{
 			"/bin/sleep", "86400",
 		},

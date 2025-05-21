@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/isaaguilar/terraform-operator-cli/cmd"
+	"github.com/isaaguilar/infrakube-cli/cmd"
 )
 
 var version string

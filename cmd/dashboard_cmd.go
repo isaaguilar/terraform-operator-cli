@@ -13,7 +13,7 @@ var dashboardCmd = &cobra.Command{
 	Use:     "dashboard",
 	Aliases: []string{"co"},
 	Short:   "Login to the dashboard with token",
-	Long:    "Using 'tfo dashboard' automatically authenticates the cli by first calling 'connect'",
+	Long:    "Using 'ik dashboard' automatically authenticates the cli by first calling 'connect'",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 		host = viper.GetString("host")

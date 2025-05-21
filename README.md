@@ -1,6 +1,6 @@
-# Terraform Operator CLI [tfo]
+# Infrakube CLI [ik]
 
-A CLI tool to aid in discovering TFO managed pods and running debug sessions
+A CLI tool to aid in discovering Infrakube managed pods and running debug sessions
 
 
 
@@ -8,46 +8,34 @@ A CLI tool to aid in discovering TFO managed pods and running debug sessions
 
 **Binary files will be created when the cli is released**
 
-Requires golang 1.17
+Requires golang 1.24
 
 You can manually build the project by:
 
 
-1. Download the repo https://github.com/isaaguilar/terraform-operator-cli
+1. Download the repo https://github.com/isaaguilar/infrakube-cli
 2. Run the `go build` command
 
 ```bash
-git clone https://github.com/isaaguilar/terraform-operator-cli.git
-cd terraform-operator-cli
-go build -o tfo main.go
-mv tfo /usr/local/bin
+git clone https://github.com/isaaguilar/infrakube-cli.git
+cd infrakube-cli
+go build -o ik main.go
+mv ik /usr/local/bin
 ```
 
 
 ## Usage
 
-Run `tfo help` for all options.
+Run `ik help` for all options.
 
-### `tfo show`
 
-Shows tfo resources. See the tfo resources in a namespace by running `tfo show`
 
-```bash
-tfo show
-```
-
-or
-
-```bash
-tfo show --namespace foo
-```
-
-### `tfo debug`
+### `ik local debug`
 
 Opens a **debug** session.
 
 ```bash
-tfo debug <tf-resource-name>
+ik local debug <tf-resource-name>
 ```
 
 **Example:**
@@ -81,29 +69,29 @@ terraform.tf.isaaguilar.com/stable configured
 Then run a debug pod:
 
 ```bash
-tfo debug --namespace default stable
+ik local debug --namespace default stable
 ```
 
-This command will create a pod on the cluster using the tfo resource for configuration. The pod puts the user in the terraform module.
+This command will create a pod on the cluster using the tf resource for configuration. The pod puts the user in the terraform module.
 ```
 Connecting to stable-2huxns3o-v3-debug-xhhtg.....
 
 Try running 'terraform init'
 
-/home/tfo-runner/generations/3/main$
+/home/i3-runner/generations/3/main$
 ```
 
 Finally, debug and exit.
 
 ```bash
-/home/tfo-runner/generations/3/main$ terraform plan
+/home/i3-runner/generations/3/main$ terraform plan
 null_resource.write_file: Refreshing state... [id=2066474016391370391]
 
 No changes. Your infrastructure matches the configuration.
 
 Terraform has compared your real infrastructure against your configuration and found no differences, so no changes are needed.
 
-/home/tfo-runner/generations/3/main$ exit
+/home/i3-runner/generations/3/main$ exit
 exit
 ```
 

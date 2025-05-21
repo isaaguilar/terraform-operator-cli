@@ -6,7 +6,7 @@ var (
 	localCmd = &cobra.Command{
 		Use:     "local",
 		Aliases: []string{"\"kubectl tf(o)\""},
-		Short:   "Use tfo with a local kubeconfig",
+		Short:   "Use ik with a local kubeconfig",
 		Args:    cobra.MaximumNArgs(0),
 	}
 )

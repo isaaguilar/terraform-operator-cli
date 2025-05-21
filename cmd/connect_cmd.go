@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/galleybytes/terraform-operator-api/pkg/api"
+	"github.com/galleybytes/infrakube-stella/pkg/api"
 	"github.com/gin-gonic/gin"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"

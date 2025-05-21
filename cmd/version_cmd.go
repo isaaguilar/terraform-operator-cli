@@ -14,7 +14,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version of this bin",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(os.Stderr, "tfo-")
+		fmt.Fprintf(os.Stderr, "ik-")
 		fmt.Printf("%s\n", version)
 	},
 }

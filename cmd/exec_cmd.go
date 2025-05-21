@@ -17,7 +17,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/eiannone/keyboard"
-	"github.com/galleybytes/terraform-operator-api/pkg/api"
+	"github.com/galleybytes/infrakube-stella/pkg/api"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -39,7 +39,7 @@ var execCmd = &cobra.Command{
 		}
 		token = viper.GetString("token")
 		if token == "" {
-			return fmt.Errorf("No token was found. Try running `tfo connect`")
+			return fmt.Errorf("No token was found. Try running `ik connect`")
 		}
 		return nil
 	},

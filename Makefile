@@ -1,5 +1,5 @@
-OUT := tfo
-PKG := github.com/isaaguilar/terraform-operator-cli
+OUT := ik
+PKG := github.com/isaaguilar/infrakube-cli
 VERSION ?= $(shell git ls-remote .|grep $$(git rev-parse HEAD).*tags|head -n1|sed "s/^.*\///")
 ifeq ($(VERSION),)
 VERSION := v0.0.0

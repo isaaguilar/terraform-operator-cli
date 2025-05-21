@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	tfv1beta1 "github.com/galleybytes/terraform-operator/pkg/apis/tf/v1beta1"
+	tfv1beta1 "github.com/galleybytes/infrakube/pkg/apis/infra3/v1"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +15,7 @@ import (
 
 var showCmd = &cobra.Command{
 	Use:   "show",
-	Short: "Show a comprehensive list of tfo related resources",
+	Short: "Show a comprehensive list of infrakube related resources",
 	Args:  cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		show("name", allNamespaces, false)
@@ -23,7 +23,7 @@ var showCmd = &cobra.Command{
 }
 
 func init() {
-	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "Show tfo resources for all namespaces")
+	showCmd.Flags().BoolVarP(&allNamespaces, "all-namespaces", "A", false, "Show infrakube resources for all namespaces")
 	//
 	// TODO the show command is broken and needs works. Perhaps "show" should be "list"
 	// Other ideas might be that "list tf" to lists the terraform resources (ie kubectl get tf)
@@ -36,7 +36,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 	var data [][]string
 	var header []string
 	var namespaces []string
-	var tfs []tfv1beta1.Terraform
+	var tfs []tfv1beta1.Tf
 	var pods []corev1.Pod
 
 	if allNamespaces {
@@ -50,7 +50,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 			namespaces = append(namespaces, namespace.Name)
 		}
 
-		tfClient := session.tfoclientset.TfV1beta1().Terraforms("")
+		tfClient := session.infrakubeclientset.Infra3V1().Tfs("")
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -67,7 +67,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 		header = []string{"Name", "Generation", "Pods"}
 		namespaces = []string{session.namespace}
 
-		tfClient := session.tfoclientset.TfV1beta1().Terraforms(session.namespace)
+		tfClient := session.infrakubeclientset.Infra3V1().Tfs(session.namespace)
 		tfList, err := tfClient.List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Fatal(err)
@@ -84,7 +84,7 @@ func show(name string, allNamespaces, showPrevious bool) {
 
 	for _, namespace := range namespaces {
 
-		var namespacedTfs []tfv1beta1.Terraform
+		var namespacedTfs []tfv1beta1.Tf
 		for _, tf := range tfs {
 			if tf.Namespace == namespace {
 				namespacedTfs = append(namespacedTfs, tf)
